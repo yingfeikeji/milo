@@ -12,7 +12,7 @@ package org.eclipse.milo.opcua.sdk.server.api.config;
 
 import java.util.concurrent.TimeUnit;
 
-import org.eclipse.milo.opcua.stack.core.serialization.EncodingLimits;
+import org.eclipse.milo.opcua.stack.core.channel.EncodingLimits;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UShort;
 
@@ -28,6 +28,17 @@ public interface OpcUaServerConfigLimits {
      */
     default UInteger getMaxSessionCount() {
         return uint(100);
+    }
+
+    /**
+     * Get the maximum session timeout, in milliseconds, allowed by the server.
+     * <p>
+     * Requests by clients for larger timeouts will be revised down to this limit.
+     *
+     * @return the maximum session timeout, in milliseconds, allowed by the server.
+     */
+    default Double getMaxSessionTimeout() {
+        return 2d * 60_000d;
     }
 
     /**
@@ -99,15 +110,15 @@ public interface OpcUaServerConfigLimits {
     }
 
     default UInteger getMaxArrayLength() {
-        return uint(EncodingLimits.DEFAULT_MAX_ARRAY_LENGTH);
+        return uint(EncodingLimits.DEFAULT_MAX_MESSAGE_SIZE / 2);
     }
 
     default UInteger getMaxStringLength() {
-        return uint(EncodingLimits.DEFAULT_MAX_STRING_LENGTH);
+        return uint(EncodingLimits.DEFAULT_MAX_MESSAGE_SIZE / 2);
     }
 
     default UInteger getMaxByteStringLength() {
-        return uint(EncodingLimits.DEFAULT_MAX_ARRAY_LENGTH);
+        return uint(EncodingLimits.DEFAULT_MAX_MESSAGE_SIZE / 2);
     }
 
     default UShort getMaxBrowseContinuationPoints() {

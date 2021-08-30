@@ -11,12 +11,11 @@
 package org.eclipse.milo.opcua.sdk.server.nodes;
 
 import java.util.Optional;
-import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableList;
 import org.eclipse.milo.opcua.sdk.core.NumericRange;
 import org.eclipse.milo.opcua.sdk.core.Reference;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.Node;
+import org.eclipse.milo.opcua.sdk.core.nodes.Node;
 import org.eclipse.milo.opcua.sdk.server.nodes.delegates.AttributeDelegate;
 import org.eclipse.milo.opcua.sdk.server.util.AttributeReader;
 import org.eclipse.milo.opcua.sdk.server.util.AttributeWriter;
@@ -28,6 +27,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
+import org.jetbrains.annotations.Nullable;
 
 public interface UaServerNode extends Node {
 

@@ -16,21 +16,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import com.google.common.collect.ImmutableSet;
 import org.eclipse.milo.opcua.sdk.core.Reference;
 import org.eclipse.milo.opcua.sdk.core.ValueRanks;
+import org.eclipse.milo.opcua.sdk.core.nodes.Node;
+import org.eclipse.milo.opcua.sdk.core.nodes.ObjectTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableNode;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
 import org.eclipse.milo.opcua.sdk.server.Session;
 import org.eclipse.milo.opcua.sdk.server.api.AddressSpaceManager;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.Node;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ObjectTypeNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.VariableNode;
 import org.eclipse.milo.opcua.sdk.server.events.operators.Operator;
 import org.eclipse.milo.opcua.sdk.server.events.operators.Operators;
-import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventNode;
+import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventTypeNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.AttributeContext;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaNode;
 import org.eclipse.milo.opcua.sdk.server.util.AttributeReader;
@@ -62,6 +60,8 @@ import org.eclipse.milo.opcua.stack.core.types.structured.EventFilterResult;
 import org.eclipse.milo.opcua.stack.core.types.structured.FilterOperand;
 import org.eclipse.milo.opcua.stack.core.types.structured.LiteralOperand;
 import org.eclipse.milo.opcua.stack.core.types.structured.SimpleAttributeOperand;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,8 +175,8 @@ public class EventContentFilter {
     @Nullable
     private static Node getRelativeNode(
         FilterContext context,
-        @Nonnull UaNode startingNode,
-        @Nonnull QualifiedName[] browsePath) {
+        @NotNull UaNode startingNode,
+        @NotNull QualifiedName[] browsePath) {
 
         UaNode relativeNode = startingNode;
 
@@ -217,8 +217,8 @@ public class EventContentFilter {
     }
 
     private static ContentFilterElementResult validateFilterElement(
-        @Nonnull FilterContext context,
-        @Nonnull ContentFilterElement filterElement) {
+        @NotNull FilterContext context,
+        @NotNull ContentFilterElement filterElement) {
 
         FilterOperator filterOperator = filterElement.getFilterOperator();
 
@@ -287,9 +287,9 @@ public class EventContentFilter {
     }
 
     public static Variant[] select(
-        @Nonnull FilterContext context,
-        @Nonnull SimpleAttributeOperand[] selectClauses,
-        @Nonnull BaseEventNode eventNode) {
+        @NotNull FilterContext context,
+        @NotNull SimpleAttributeOperand[] selectClauses,
+        @NotNull BaseEventTypeNode eventNode) {
 
         return Arrays.stream(selectClauses).map(operand -> {
             try {
@@ -301,9 +301,9 @@ public class EventContentFilter {
     }
 
     public static boolean evaluate(
-        @Nonnull FilterContext context,
-        @Nonnull ContentFilter whereClause,
-        @Nonnull BaseEventNode eventNode) throws UaException {
+        @NotNull FilterContext context,
+        @NotNull ContentFilter whereClause,
+        @NotNull BaseEventTypeNode eventNode) throws UaException {
 
         if (whereClause.getElements() == null || whereClause.getElements().length == 0) {
             return true;
@@ -326,9 +326,9 @@ public class EventContentFilter {
 
     @Nullable
     private static Object evaluate(
-        @Nonnull OperatorContext context,
-        @Nonnull BaseEventNode eventNode,
-        @Nonnull ContentFilterElement element) throws UaException {
+        @NotNull OperatorContext context,
+        @NotNull BaseEventTypeNode eventNode,
+        @NotNull ContentFilterElement element) throws UaException {
 
         FilterOperator filterOperator = element.getFilterOperator();
         if (filterOperator == null) {
@@ -345,7 +345,7 @@ public class EventContentFilter {
         return operator.apply(context, eventNode, filterOperands);
     }
 
-    @Nonnull
+    @NotNull
     private static FilterOperand[] decodeOperands(
         SerializationContext context,
         @Nullable ExtensionObject[] operandXos
@@ -360,8 +360,8 @@ public class EventContentFilter {
         }
     }
 
-    @Nonnull
-    private static Operator<?> getOperator(@Nonnull FilterOperator filterOperator) {
+    @NotNull
+    private static Operator<?> getOperator(@NotNull FilterOperator filterOperator) {
         //@formatter:off
         switch (filterOperator) {
             // Basic FilterOperators
@@ -400,7 +400,7 @@ public class EventContentFilter {
             case InView:
                 return Operators.UNSUPPORTED;
             case OfType:
-                return Operators.UNSUPPORTED;
+                return Operators.OF_TYPE;
             case RelatedTo:
                 return Operators.UNSUPPORTED;
             default:
@@ -411,9 +411,9 @@ public class EventContentFilter {
 
     @SuppressWarnings("unused")
     private static Object getAttribute(
-        @Nonnull FilterContext context,
-        @Nonnull AttributeOperand operand,
-        @Nonnull BaseEventNode eventNode) throws UaException {
+        @NotNull FilterContext context,
+        @NotNull AttributeOperand operand,
+        @NotNull BaseEventTypeNode eventNode) throws UaException {
 
         // AttributeOperand is not allowed to be used in EventFilters... it's for the Query services.
         // Right now Query services are unsupported and this class exists to handle the application
@@ -422,9 +422,9 @@ public class EventContentFilter {
     }
 
     private static Object getSimpleAttribute(
-        @Nonnull FilterContext context,
-        @Nonnull SimpleAttributeOperand operand,
-        @Nonnull BaseEventNode eventNode) throws UaException {
+        @NotNull FilterContext context,
+        @NotNull SimpleAttributeOperand operand,
+        @NotNull BaseEventTypeNode eventNode) throws UaException {
 
         NodeId typeDefinitionId = operand.getTypeDefinitionId();
 
@@ -488,7 +488,7 @@ public class EventContentFilter {
         }
     }
 
-    private static boolean subtypeOf(NodeId typeId, NodeId superTypeId, OpcUaServer server) {
+    public static boolean subtypeOf(NodeId typeId, NodeId superTypeId, OpcUaServer server) {
         UaNode node = server.getAddressSpaceManager().getManagedNode(typeId).orElse(null);
 
         if (node instanceof ObjectTypeNode) {
@@ -508,7 +508,7 @@ public class EventContentFilter {
         return addressSpaceManager.getManagedReferences(node.getNodeId())
             .stream()
             .filter(Reference.SUBTYPE_OF)
-            .flatMap(r -> opt2stream(r.getTargetNodeId().local(namespaceTable)))
+            .flatMap(r -> opt2stream(r.getTargetNodeId().toNodeId(namespaceTable)))
             .findFirst()
             .flatMap(addressSpaceManager::getManagedNode);
     }
@@ -540,7 +540,7 @@ public class EventContentFilter {
 
         @Nullable
         @Override
-        public Object resolve(FilterOperand operand, BaseEventNode eventNode) throws UaException {
+        public Object resolve(FilterOperand operand, BaseEventTypeNode eventNode) throws UaException {
             if (operand instanceof LiteralOperand) {
                 return ((LiteralOperand) operand).getValue().getValue();
             } else if (operand instanceof ElementOperand) {

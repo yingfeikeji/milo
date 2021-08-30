@@ -13,7 +13,6 @@ package org.eclipse.milo.opcua.stack.client;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import javax.annotation.Nullable;
 
 import com.google.common.collect.Maps;
 import org.eclipse.milo.opcua.stack.client.transport.UaTransport;
@@ -24,7 +23,7 @@ import org.eclipse.milo.opcua.stack.core.NamespaceTable;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.UaServiceFaultException;
-import org.eclipse.milo.opcua.stack.core.serialization.EncodingLimits;
+import org.eclipse.milo.opcua.stack.core.channel.EncodingLimits;
 import org.eclipse.milo.opcua.stack.core.serialization.SerializationContext;
 import org.eclipse.milo.opcua.stack.core.serialization.UaRequestMessage;
 import org.eclipse.milo.opcua.stack.core.serialization.UaResponseMessage;
@@ -39,6 +38,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.ResponseHeader;
 import org.eclipse.milo.opcua.stack.core.types.structured.ServiceFault;
 import org.eclipse.milo.opcua.stack.core.util.ExecutionQueue;
 import org.eclipse.milo.opcua.stack.core.util.LongSequence;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,12 +52,19 @@ public class UaStackClient {
 
     private final Map<UInteger, CompletableFuture<UaResponseMessage>> pending = Maps.newConcurrentMap();
 
-    private final DataTypeManager dataTypeManager = new DefaultDataTypeManager();
     private final NamespaceTable namespaceTable = new NamespaceTable();
+
+    private final DataTypeManager staticDataTypeManager =
+        DefaultDataTypeManager.createAndInitialize(namespaceTable);
+
+    private final DataTypeManager dynamicDataTypeManager =
+        DefaultDataTypeManager.createAndInitialize(namespaceTable);
+
+    private final SerializationContext staticSerializationContext;
+    private final SerializationContext dynamicSerializationContext;
 
     private final UaTransport transport;
     private final ExecutionQueue deliveryQueue;
-    private final SerializationContext serializationContext;
 
     private final UaStackClientConfig config;
 
@@ -70,7 +77,7 @@ public class UaStackClient {
 
         deliveryQueue = new ExecutionQueue(config.getExecutor());
 
-        serializationContext = new SerializationContext() {
+        staticSerializationContext = new SerializationContext() {
             @Override
             public EncodingLimits getEncodingLimits() {
                 return config.getEncodingLimits();
@@ -83,7 +90,24 @@ public class UaStackClient {
 
             @Override
             public DataTypeManager getDataTypeManager() {
-                return dataTypeManager;
+                return staticDataTypeManager;
+            }
+        };
+
+        dynamicSerializationContext = new SerializationContext() {
+            @Override
+            public EncodingLimits getEncodingLimits() {
+                return config.getEncodingLimits();
+            }
+
+            @Override
+            public NamespaceTable getNamespaceTable() {
+                return namespaceTable;
+            }
+
+            @Override
+            public DataTypeManager getDataTypeManager() {
+                return dynamicDataTypeManager;
             }
         };
 
@@ -129,15 +153,6 @@ public class UaStackClient {
     }
 
     /**
-     * Get the client {@link DataTypeManager}.
-     *
-     * @return the client {@link DataTypeManager}.
-     */
-    public DataTypeManager getDataTypeManager() {
-        return dataTypeManager;
-    }
-
-    /**
      * Get the client {@link NamespaceTable}.
      *
      * @return the client {@link NamespaceTable}.
@@ -147,12 +162,52 @@ public class UaStackClient {
     }
 
     /**
-     * Get the client {@link SerializationContext}.
+     * Get the client's "static" {@link DataTypeManager}.
+     * <p>
+     * This {@link DataTypeManager} is for static codecs that serialize classes that exist at
+     * compile time, e.g. structures from namespace 0 and or code-generated structures.
      *
-     * @return the client {@link SerializationContext}.
+     * @return the client's static {@link DataTypeManager}.
      */
-    public SerializationContext getSerializationContext() {
-        return serializationContext;
+    public DataTypeManager getStaticDataTypeManager() {
+        return staticDataTypeManager;
+    }
+
+    /**
+     * Get the client's "dynamic" {@link DataTypeManager}.
+     * <p>
+     * This {@link DataTypeManager} is for dynamic codecs that were created by reading the server's
+     * DataType Dictionary at runtime and serializes generic representations of structures used by
+     * instances of a BsdParser implementation.
+     *
+     * @return the client's dynamic {@link DataTypeManager}.
+     */
+    public DataTypeManager getDynamicDataTypeManager() {
+        return dynamicDataTypeManager;
+    }
+
+    /**
+     * Get a "static" {@link SerializationContext} instance.
+     * <p>
+     * This {@link SerializationContext} instance returns the client's static {@link DataTypeManager}.
+     *
+     * @return a "static" {@link SerializationContext} instance.
+     * @see #getStaticDataTypeManager()
+     */
+    public SerializationContext getStaticSerializationContext() {
+        return staticSerializationContext;
+    }
+
+    /**
+     * Get a "dynamic" {@link SerializationContext}.
+     * <p>
+     * This {@link SerializationContext} instance returns the client's dynamic {@link DataTypeManager}.
+     *
+     * @return a "dynamic" {@link SerializationContext}.
+     * @see #getDynamicDataTypeManager()
+     */
+    public SerializationContext getDynamicSerializationContext() {
+        return dynamicSerializationContext;
     }
 
     /**

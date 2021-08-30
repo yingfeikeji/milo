@@ -12,7 +12,8 @@ package org.eclipse.milo.opcua.stack.core.types.builtin.unsigned;
 
 import java.io.ObjectStreamException;
 import java.math.BigInteger;
-import javax.annotation.Nonnull;
+
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The <code>unsigned byte</code> type
@@ -67,7 +68,7 @@ public final class UByte extends UNumber implements Comparable<UByte> {
      *
      * @return Array of cached values for UByte.
      */
-    private static final UByte[] mkValues() {
+    private static UByte[] mkValues() {
         UByte[] ret = new UByte[256];
 
         for (int i = Byte.MIN_VALUE; i <= Byte.MAX_VALUE; i++)
@@ -275,7 +276,7 @@ public final class UByte extends UNumber implements Comparable<UByte> {
     }
 
     @Override
-    public int compareTo(@Nonnull UByte o) {
+    public int compareTo(@NotNull UByte o) {
         return (value < o.value ? -1 : (value == o.value ? 0 : 1));
     }
 

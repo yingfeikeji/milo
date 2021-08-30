@@ -10,12 +10,11 @@
 
 package org.eclipse.milo.opcua.sdk.server.events.operators;
 
-import javax.annotation.Nullable;
-
 import com.google.common.primitives.UnsignedLongs;
 import org.eclipse.milo.opcua.sdk.server.events.OperatorContext;
-import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventNode;
+import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventTypeNode;
 import org.eclipse.milo.opcua.stack.core.BuiltinDataType;
+import org.jetbrains.annotations.Nullable;
 
 public class GreaterThan extends ImplicitConversionBinaryOperator<Boolean> {
 
@@ -25,7 +24,7 @@ public class GreaterThan extends ImplicitConversionBinaryOperator<Boolean> {
     @Override
     protected Boolean apply(
         OperatorContext context,
-        BaseEventNode eventNode,
+        BaseEventTypeNode eventNode,
         BuiltinDataType dataType,
         @Nullable Object operand0,
         @Nullable Object operand1) {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 the Eclipse Milo Authors
+ * Copyright (c) 2021 the Eclipse Milo Authors
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -21,15 +21,21 @@ import org.eclipse.milo.opcua.sdk.server.nodes.AttributeContext;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaMethodNode;
 import org.eclipse.milo.opcua.sdk.server.util.AttributeUtil;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
+import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
+import org.eclipse.milo.opcua.stack.core.UaSerializationException;
+import org.eclipse.milo.opcua.stack.core.serialization.SerializationContext;
+import org.eclipse.milo.opcua.stack.core.serialization.UaStructure;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DiagnosticInfo;
+import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.structured.Argument;
 import org.eclipse.milo.opcua.stack.core.types.structured.CallMethodRequest;
 import org.eclipse.milo.opcua.stack.core.types.structured.CallMethodResult;
+import org.slf4j.LoggerFactory;
 
 /**
  * A partial implementation of {@link MethodInvocationHandler} that handles checking the Executable and UserExecutable
@@ -52,31 +58,54 @@ public abstract class AbstractMethodInvocationHandler implements MethodInvocatio
 
     @Override
     public final CallMethodResult invoke(AccessContext accessContext, CallMethodRequest request) {
-        StatusCode[] inputArgumentResults = new StatusCode[0];
-
         try {
             checkExecutableAttributes(accessContext);
 
-            Variant[] inputValues = request.getInputArguments();
-            if (inputValues == null) inputValues = new Variant[0];
+            Variant[] inputArgumentValues = request.getInputArguments();
+            if (inputArgumentValues == null) inputArgumentValues = new Variant[0];
 
-            if (inputValues.length != getInputArguments().length) {
+            if (inputArgumentValues.length != getInputArguments().length) {
                 throw new UaException(StatusCodes.Bad_ArgumentsMissing);
             }
 
-            inputArgumentResults = new StatusCode[inputValues.length];
+            StatusCode[] inputDataTypeCheckResults = new StatusCode[inputArgumentValues.length];
 
-            for (int i = 0; i < inputValues.length; i++) {
+            for (int i = 0; i < inputArgumentValues.length; i++) {
                 Argument argument = getInputArguments()[i];
 
-                Variant variant = inputValues[i];
+                Variant variant = inputArgumentValues[i];
                 Object value = variant.getValue();
 
                 // TODO this needs to be able to match when argument DataType is an alias type
                 //  extract subtype logic from AttributeWriter...
                 boolean dataTypeMatch = value == null ||
                     variant.getDataType()
-                        .map(type -> type.equals(argument.getDataType()))
+                        .flatMap(xni -> xni.toNodeId(node.getNodeContext().getNamespaceTable()))
+                        .map(type -> {
+                            if (type.equals(argument.getDataType())) {
+                                return true;
+                            } else {
+                                if (Identifiers.Structure.equals(type) && value instanceof ExtensionObject) {
+                                    SerializationContext serializationContext =
+                                        getNode().getNodeContext().getServer().getSerializationContext();
+
+                                    try {
+                                        Object decoded = ((ExtensionObject) value).decode(serializationContext);
+
+                                        if (decoded instanceof UaStructure) {
+                                            return ((UaStructure) decoded).getTypeId()
+                                                .toNodeId(node.getNodeContext().getNamespaceTable())
+                                                .map(argument.getDataType()::equals).orElse(false);
+                                        }
+                                    } catch (UaSerializationException e) {
+                                        LoggerFactory.getLogger(getClass())
+                                            .warn("Error decoding argument value", e);
+                                    }
+                                }
+
+                                return false;
+                            }
+                        })
                         .orElse(false);
 
                 switch (argument.getValueRank()) {
@@ -96,15 +125,17 @@ public abstract class AbstractMethodInvocationHandler implements MethodInvocatio
                 }
 
                 if (dataTypeMatch) {
-                    inputArgumentResults[i] = StatusCode.GOOD;
+                    inputDataTypeCheckResults[i] = StatusCode.GOOD;
                 } else {
-                    inputArgumentResults[i] = new StatusCode(StatusCodes.Bad_TypeMismatch);
+                    inputDataTypeCheckResults[i] = new StatusCode(StatusCodes.Bad_TypeMismatch);
                 }
             }
 
-            if (Arrays.stream(inputArgumentResults).anyMatch(StatusCode::isBad)) {
-                throw new UaException(StatusCodes.Bad_InvalidArgument);
+            if (Arrays.stream(inputDataTypeCheckResults).anyMatch(StatusCode::isBad)) {
+                throw new InvalidArgumentException(inputDataTypeCheckResults);
             }
+
+            validateInputArgumentValues(inputArgumentValues);
 
             InvocationContext invocationContext = new InvocationContext() {
                 @Override
@@ -128,21 +159,18 @@ public abstract class AbstractMethodInvocationHandler implements MethodInvocatio
                 }
             };
 
-            Variant[] outputValues = invoke(invocationContext, inputValues);
+            Variant[] outputValues = invoke(invocationContext, inputArgumentValues);
 
-            return new CallMethodResult(
-                StatusCode.GOOD,
-                inputArgumentResults,
-                new DiagnosticInfo[0],
-                outputValues
-            );
-        } catch (UaException e) {
+            return new CallMethodResult(StatusCode.GOOD, new StatusCode[0], new DiagnosticInfo[0], outputValues);
+        } catch (InvalidArgumentException e) {
             return new CallMethodResult(
                 e.getStatusCode(),
-                inputArgumentResults,
-                new DiagnosticInfo[0],
+                e.getInputArgumentResults(),
+                e.getInputArgumentDiagnosticInfos(),
                 new Variant[0]
             );
+        } catch (UaException e) {
+            return new CallMethodResult(e.getStatusCode(), new StatusCode[0], new DiagnosticInfo[0], new Variant[0]);
         }
     }
 
@@ -207,7 +235,22 @@ public abstract class AbstractMethodInvocationHandler implements MethodInvocatio
      * @return this output values matching this Method's output arguments, if any.
      * @throws UaException if invocation has failed for some reason.
      */
-    protected abstract Variant[] invoke(InvocationContext invocationContext, Variant[] inputValues) throws UaException;
+    protected abstract Variant[] invoke(
+        InvocationContext invocationContext,
+        Variant[] inputValues
+    ) throws UaException;
+
+    /**
+     * Validate the input values against the expected input arguments.
+     * <p>
+     * The DataType of each input value has already been verified; implementations need only verify
+     * the value is "valid", if applicable, and throw InvalidArgumentException with a StatusCode of
+     * Bad_OutOfRange for any invalid input values.
+     *
+     * @param inputArgumentValues the input values provided by the client for the current method call.
+     * @throws InvalidArgumentException if one or more input argument values are invalid.
+     */
+    protected void validateInputArgumentValues(Variant[] inputArgumentValues) throws InvalidArgumentException {}
 
     /**
      * Extends {@link AccessContext} to provide additional context to implementations of

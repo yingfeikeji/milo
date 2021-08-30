@@ -10,11 +10,10 @@
 
 package org.eclipse.milo.opcua.stack.core.types;
 
-import javax.annotation.Nullable;
-
 import org.eclipse.milo.opcua.stack.core.serialization.codecs.DataTypeCodec;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
+import org.jetbrains.annotations.Nullable;
 
 public interface DataTypeManager {
 
@@ -46,6 +45,15 @@ public interface DataTypeManager {
      */
     @Nullable
     DataTypeCodec getCodec(String namespaceUri, String description);
+
+    /**
+     * Get a registered {@link DataTypeDictionary} by its namespace URI.
+     *
+     * @param namespaceUri the namespace URI the dictionary is registered under.
+     * @return the {@link DataTypeDictionary} registered under {@code namespaceUri}.
+     */
+    @Nullable
+    DataTypeDictionary<?> getDataTypeDictionary(String namespaceUri);
 
     /**
      * Register a {@link DataTypeCodec} by its encoding id.

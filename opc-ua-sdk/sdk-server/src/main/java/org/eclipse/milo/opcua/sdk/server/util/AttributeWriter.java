@@ -12,15 +12,14 @@ package org.eclipse.milo.opcua.sdk.server.util;
 
 import java.util.Optional;
 import java.util.Set;
-import javax.annotation.Nullable;
 
 import org.eclipse.milo.opcua.sdk.core.AccessLevel;
 import org.eclipse.milo.opcua.sdk.core.NumericRange;
 import org.eclipse.milo.opcua.sdk.core.Reference;
 import org.eclipse.milo.opcua.sdk.core.ValueRanks;
 import org.eclipse.milo.opcua.sdk.core.WriteMask;
+import org.eclipse.milo.opcua.sdk.core.nodes.DataTypeNode;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.DataTypeNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.AttributeContext;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.UaServerNode;
@@ -39,6 +38,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
 import org.eclipse.milo.opcua.stack.core.util.ArrayUtil;
 import org.eclipse.milo.opcua.stack.core.util.TypeUtil;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -146,11 +146,9 @@ public class AttributeWriter {
 
                 validateArrayType(valueRank, arrayDimensions, value);
             }
-
-            node.setAttribute(context, attributeId, value);
-        } else {
-            node.setAttribute(context, attributeId, value);
         }
+
+        node.setAttribute(context, attributeId, value);
     }
 
     private static WriteMask writeMaskForAttribute(AttributeId attributeId) {
@@ -418,7 +416,7 @@ public class AttributeWriter {
             return dataTypeNode.getReferences()
                 .stream()
                 .filter(Reference.SUBTYPE_OF)
-                .flatMap(r -> opt2stream(r.getTargetNodeId().local(server.getNamespaceTable())))
+                .flatMap(r -> opt2stream(r.getTargetNodeId().toNodeId(server.getNamespaceTable())))
                 .findFirst()
                 .orElse(null);
         } else {

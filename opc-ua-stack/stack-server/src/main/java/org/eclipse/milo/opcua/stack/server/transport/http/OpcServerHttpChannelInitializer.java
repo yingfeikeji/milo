@@ -55,7 +55,7 @@ public class OpcServerHttpChannelInitializer extends ChannelInitializer<SocketCh
         this.stackServer = stackServer;
 
         KeyPair keyPair = stackServer.getConfig().getHttpsKeyPair().orElse(null);
-        X509Certificate httpsCertificate = stackServer.getConfig().getHttpsCertificate().orElse(null);
+        X509Certificate[] httpsCertificate = stackServer.getConfig().getHttpsCertificateChain().orElse(null);
 
         if (keyPair != null && httpsCertificate != null) {
             try {
@@ -108,7 +108,7 @@ public class OpcServerHttpChannelInitializer extends ChannelInitializer<SocketCh
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest httpRequest) throws Exception {
+        protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest httpRequest) {
             String host = httpRequest.headers().get(HttpHeaderNames.HOST);
             String uri = httpRequest.uri();
 

@@ -10,17 +10,15 @@
 
 package org.eclipse.milo.opcua.sdk.server.nodes.delegates;
 
-import javax.annotation.Nullable;
-
-import org.eclipse.milo.opcua.sdk.server.api.nodes.DataTypeNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.MethodNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.Node;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ObjectNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ObjectTypeNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ReferenceTypeNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.VariableNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.VariableTypeNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ViewNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.DataTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.MethodNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.Node;
+import org.eclipse.milo.opcua.sdk.core.nodes.ObjectNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.ObjectTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.ReferenceTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.ViewNode;
 import org.eclipse.milo.opcua.sdk.server.nodes.AttributeContext;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
@@ -30,6 +28,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UByte;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
@@ -158,7 +157,10 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
     @Override
     public void setUserExecutable(
-        AttributeContext context, MethodNode node, Boolean userExecutable) throws UaException {
+        AttributeContext context,
+        MethodNode node,
+        Boolean userExecutable
+    ) throws UaException {
 
         delegate.setUserExecutable(context, node, userExecutable);
     }
@@ -211,7 +213,12 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
     }
 
     @Override
-    public void setIsAbstract(AttributeContext context, ReferenceTypeNode node, Boolean isAbstract) throws UaException {
+    public void setIsAbstract(
+        AttributeContext context,
+        ReferenceTypeNode node,
+        Boolean isAbstract
+    ) throws UaException {
+
         delegate.setIsAbstract(context, node, isAbstract);
     }
 
@@ -222,7 +229,10 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
     @Override
     public void setInverseName(
-        AttributeContext context, ReferenceTypeNode node, LocalizedText inverseName) throws UaException {
+        AttributeContext context,
+        ReferenceTypeNode node,
+        LocalizedText inverseName
+    ) throws UaException {
 
         delegate.setInverseName(context, node, inverseName);
     }
@@ -288,7 +298,10 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
     @Override
     public void setArrayDimensions(
-        AttributeContext context, VariableNode node, UInteger[] arrayDimensions) throws UaException {
+        AttributeContext context,
+        VariableNode node,
+        UInteger[] arrayDimensions
+    ) throws UaException {
 
         delegate.setArrayDimensions(context, node, arrayDimensions);
     }
@@ -307,7 +320,10 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
     @Override
     public void setMinimumSamplingInterval(
-        AttributeContext context, VariableNode node, Double minimumSamplingInterval) throws UaException {
+        AttributeContext context,
+        VariableNode node,
+        Double minimumSamplingInterval
+    ) throws UaException {
 
         delegate.setMinimumSamplingInterval(context, node, minimumSamplingInterval);
     }
@@ -369,7 +385,12 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
     }
 
     @Override
-    public void setIsAbstract(AttributeContext context, VariableTypeNode node, Boolean isAbstract) throws UaException {
+    public void setIsAbstract(
+        AttributeContext context,
+        VariableTypeNode node,
+        Boolean isAbstract
+    ) throws UaException {
+
         delegate.setIsAbstract(context, node, isAbstract);
     }
 
@@ -389,7 +410,10 @@ public abstract class DelegatingAttributeDelegate implements AttributeDelegate {
 
     @Override
     public void setContainsNoLoops(
-        AttributeContext context, ViewNode node, Boolean containsNoLoops) throws UaException {
+        AttributeContext context,
+        ViewNode node,
+        Boolean containsNoLoops
+    ) throws UaException {
 
         delegate.setContainsNoLoops(context, node, containsNoLoops);
     }

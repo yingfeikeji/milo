@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 the Eclipse Milo Authors
+ * Copyright (c) 2021 the Eclipse Milo Authors
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -10,28 +10,31 @@
 
 package org.eclipse.milo.opcua.sdk.server.nodes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
-import org.eclipse.milo.opcua.sdk.core.QualifiedProperty;
-import org.eclipse.milo.opcua.sdk.core.ValueRanks;
+import org.eclipse.milo.opcua.sdk.core.Reference;
+import org.eclipse.milo.opcua.sdk.core.nodes.MethodNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.MethodNodeProperties;
+import org.eclipse.milo.opcua.sdk.core.nodes.Node;
+import org.eclipse.milo.opcua.sdk.core.nodes.ObjectNode;
+import org.eclipse.milo.opcua.sdk.server.api.NodeManager;
 import org.eclipse.milo.opcua.sdk.server.api.methods.MethodInvocationHandler;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.MethodNode;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.Node;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.ObjectNode;
+import org.eclipse.milo.opcua.sdk.server.nodes.filters.AttributeFilter;
+import org.eclipse.milo.opcua.sdk.server.nodes.filters.AttributeFilterChain;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
-import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
 import org.eclipse.milo.opcua.stack.core.types.structured.Argument;
-import org.eclipse.milo.opcua.stack.core.util.Namespaces;
+import org.jetbrains.annotations.Nullable;
 
 import static org.eclipse.milo.opcua.sdk.core.Reference.ALWAYS_GENERATES_EVENT_PREDICATE;
 import static org.eclipse.milo.opcua.sdk.core.Reference.HAS_MODELLING_RULE_PREDICATE;
@@ -65,26 +68,55 @@ public class UaMethodNode extends UaNode implements MethodNode {
 
     @Override
     public Boolean isExecutable() {
-        return executable;
+        return (Boolean) filterChain.getAttribute(this, AttributeId.Executable);
     }
 
     @Override
     public Boolean isUserExecutable() {
-        return userExecutable;
+        return (Boolean) filterChain.getAttribute(this, AttributeId.UserExecutable);
     }
 
     @Override
-    public synchronized void setExecutable(Boolean executable) {
-        this.executable = executable;
-
-        fireAttributeChanged(AttributeId.Executable, executable);
+    public void setExecutable(Boolean executable) {
+        filterChain.setAttribute(this, AttributeId.Executable, executable);
     }
 
     @Override
-    public synchronized void setUserExecutable(Boolean userExecutable) {
-        this.userExecutable = userExecutable;
+    public void setUserExecutable(Boolean userExecutable) {
+        filterChain.setAttribute(this, AttributeId.UserExecutable, userExecutable);
+    }
 
-        fireAttributeChanged(AttributeId.UserExecutable, userExecutable);
+    @Override
+    public synchronized Object getAttribute(AttributeId attributeId) {
+        switch (attributeId) {
+            case Executable:
+                return executable;
+
+            case UserExecutable:
+                return userExecutable;
+
+            default:
+                return super.getAttribute(attributeId);
+        }
+    }
+
+    @Override
+    public synchronized void setAttribute(AttributeId attributeId, Object value) {
+        switch (attributeId) {
+            case Executable:
+                executable = (Boolean) value;
+                break;
+
+            case UserExecutable:
+                userExecutable = (Boolean) value;
+                break;
+
+            default:
+                super.setAttribute(attributeId, value);
+                return; // prevent firing an attribute change
+        }
+
+        fireAttributeChanged(attributeId, value);
     }
 
     public List<Node> getPropertyNodes() {
@@ -121,57 +153,74 @@ public class UaMethodNode extends UaNode implements MethodNode {
         this.handler = handler;
     }
 
+    /**
+     * Get the value of the NodeVersion Property, if it exists.
+     *
+     * @return the value of the NodeVersion Property, if it exists.
+     * @see MethodNodeProperties#NodeVersion
+     */
     @Nullable
     public String getNodeVersion() {
-        return getProperty(NodeVersion).orElse(null);
+        return getProperty(MethodNodeProperties.NodeVersion).orElse(null);
     }
 
+    /**
+     * Get the value of the InputArguments Property, if it exists.
+     *
+     * @return the value of the InputArguments Property, if it exists.
+     * @see MethodNodeProperties#InputArguments
+     */
     @Nullable
     public Argument[] getInputArguments() {
-        return getProperty(InputArguments).orElse(null);
+        return getProperty(MethodNodeProperties.InputArguments).orElse(null);
     }
 
+    /**
+     * Get the value of the OutputArguments Property, if it exists.
+     *
+     * @return the value of the OutputArguments Property, if it exists.
+     * @see MethodNodeProperties#OutputArguments
+     */
     @Nullable
     public Argument[] getOutputArguments() {
-        return getProperty(OutputArguments).orElse(null);
+        return getProperty(MethodNodeProperties.OutputArguments).orElse(null);
     }
 
+    /**
+     * Set the value of the NodeVersion Property.
+     * <p>
+     * A PropertyNode will be created if it does not already exist.
+     *
+     * @param nodeVersion the value to set.
+     * @see MethodNodeProperties#NodeVersion
+     */
     public void setNodeVersion(String nodeVersion) {
-        setProperty(NodeVersion, nodeVersion);
+        setProperty(MethodNodeProperties.NodeVersion, nodeVersion);
     }
 
+    /**
+     * Set the value of the InputArguments Property.
+     * <p>
+     * A PropertyNode will be created if it does not already exist.
+     *
+     * @param inputArguments the value to set.
+     * @see MethodNodeProperties#InputArguments
+     */
     public void setInputArguments(Argument[] inputArguments) {
-        setProperty(InputArguments, inputArguments);
+        setProperty(MethodNodeProperties.InputArguments, inputArguments);
     }
 
+    /**
+     * Set the value of the OutputArguments Property.
+     * <p>
+     * A PropertyNode will be created if it does not already exist.
+     *
+     * @param outputArguments the value to set.
+     * @see MethodNodeProperties#OutputArguments
+     */
     public void setOutputArguments(Argument[] outputArguments) {
-        setProperty(OutputArguments, outputArguments);
+        setProperty(MethodNodeProperties.OutputArguments, outputArguments);
     }
-
-
-    public static final QualifiedProperty<Argument[]> InputArguments = new QualifiedProperty<>(
-        Namespaces.OPC_UA,
-        "InputArguments",
-        Identifiers.Argument,
-        ValueRanks.OneDimension,
-        Argument[].class
-    );
-
-    public static final QualifiedProperty<Argument[]> OutputArguments = new QualifiedProperty<>(
-        Namespaces.OPC_UA,
-        "OutputArguments",
-        Identifiers.Argument,
-        ValueRanks.OneDimension,
-        Argument[].class
-    );
-
-    public static final QualifiedProperty<String> NodeVersion = new QualifiedProperty<>(
-        Namespaces.OPC_UA,
-        "NodeVersion",
-        Identifiers.String,
-        ValueRanks.Scalar,
-        String.class
-    );
 
     /**
      * @return a new {@link UaMethodNodeBuilder}.
@@ -180,7 +229,30 @@ public class UaMethodNode extends UaNode implements MethodNode {
         return new UaMethodNodeBuilder(context);
     }
 
+    /**
+     * Build a {@link UaMethodNode} using the {@link UaMethodNodeBuilder} supplied to the
+     * {@code build} function.
+     *
+     * @param context a {@link UaNodeContext}.
+     * @param build   a function that accepts a {@link UaMethodNodeBuilder} and uses it to build
+     *                and return a {@link UaMethodNode}.
+     * @return a {@link UaMethodNode} built using the supplied {@link UaMethodNodeBuilder}.
+     */
+    public static UaMethodNode build(
+        UaNodeContext context,
+        Function<UaMethodNodeBuilder, UaMethodNode> build
+    ) {
+
+        UaMethodNodeBuilder builder = new UaMethodNodeBuilder(context);
+
+        return build.apply(builder);
+    }
+
     public static class UaMethodNodeBuilder implements Supplier<UaMethodNode> {
+
+        private final List<AttributeFilter> attributeFilters = new ArrayList<>();
+
+        private final List<Reference> references = new ArrayList<>();
 
         private NodeId nodeId;
         private QualifiedName browseName;
@@ -198,17 +270,27 @@ public class UaMethodNode extends UaNode implements MethodNode {
             this.context = context;
         }
 
+        /**
+         * @see #build()
+         */
         @Override
         public UaMethodNode get() {
             return build();
         }
 
+        /**
+         * Build and return the {@link UaMethodNode}.
+         * <p>
+         * The following fields are required: NodeId, BrowseName, DisplayName.
+         *
+         * @return a {@link UaMethodNode} built from the configuration of this builder.
+         */
         public UaMethodNode build() {
             Preconditions.checkNotNull(nodeId, "NodeId cannot be null");
             Preconditions.checkNotNull(browseName, "BrowseName cannot be null");
             Preconditions.checkNotNull(displayName, "DisplayName cannot be null");
 
-            return new UaMethodNode(
+            UaMethodNode node = new UaMethodNode(
                 context,
                 nodeId,
                 browseName,
@@ -219,6 +301,25 @@ public class UaMethodNode extends UaNode implements MethodNode {
                 executable,
                 userExecutable
             );
+
+            references.forEach(node::addReference);
+
+            node.getFilterChain().addLast(attributeFilters);
+
+            return node;
+        }
+
+        /**
+         * Build the {@link UaMethodNode} using the configured values and add it to the
+         * {@link NodeManager} from the {@link UaNodeContext}.
+         *
+         * @return a {@link UaMethodNode} built from the configured values.
+         * @see #build()
+         */
+        public UaMethodNode buildAndAdd() {
+            UaMethodNode node = build();
+            context.getNodeManager().addNode(node);
+            return node;
         }
 
         public UaMethodNodeBuilder setNodeId(NodeId nodeId) {
@@ -258,6 +359,63 @@ public class UaMethodNode extends UaNode implements MethodNode {
 
         public UaMethodNodeBuilder setUserExecutable(boolean userExecutable) {
             this.userExecutable = userExecutable;
+            return this;
+        }
+
+        public NodeId getNodeId() {
+            return nodeId;
+        }
+
+        public QualifiedName getBrowseName() {
+            return browseName;
+        }
+
+        public LocalizedText getDisplayName() {
+            return displayName;
+        }
+
+        public LocalizedText getDescription() {
+            return description;
+        }
+
+        public UInteger getWriteMask() {
+            return writeMask;
+        }
+
+        public UInteger getUserWriteMask() {
+            return userWriteMask;
+        }
+
+        public boolean isExecutable() {
+            return executable;
+        }
+
+        public boolean isUserExecutable() {
+            return userExecutable;
+        }
+
+        /**
+         * Add an {@link AttributeFilter} that will be added to the node's
+         * {@link AttributeFilterChain} when it's built.
+         * <p>
+         * The order filters are added in this builder is maintained.
+         *
+         * @param attributeFilter the {@link AttributeFilter} to add.
+         * @return this {@link UaMethodNodeBuilder}.
+         */
+        public UaMethodNodeBuilder addAttributeFilter(AttributeFilter attributeFilter) {
+            attributeFilters.add(attributeFilter);
+            return this;
+        }
+
+        /**
+         * Add a {@link Reference} to the node when it's built.
+         *
+         * @param reference the {@link Reference} to add.
+         * @return this {@link UaMethodNodeBuilder}.
+         */
+        public UaMethodNodeBuilder addReference(Reference reference) {
+            references.add(reference);
             return this;
         }
 

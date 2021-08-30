@@ -12,19 +12,19 @@ package org.eclipse.milo.opcua.sdk.server.events.operators;
 
 import java.lang.reflect.Array;
 import java.util.Objects;
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 import org.eclipse.milo.opcua.sdk.server.events.FilterContext;
 import org.eclipse.milo.opcua.sdk.server.events.OperatorContext;
 import org.eclipse.milo.opcua.sdk.server.events.ValidationException;
 import org.eclipse.milo.opcua.sdk.server.events.conversions.ImplicitConversions;
-import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventNode;
+import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventTypeNode;
 import org.eclipse.milo.opcua.stack.core.BuiltinDataType;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.types.structured.FilterOperand;
 import org.eclipse.milo.opcua.stack.core.util.ArrayUtil;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class Equals implements Operator<Boolean> {
 
@@ -41,7 +41,7 @@ public class Equals implements Operator<Boolean> {
     @Override
     public Boolean apply(
         OperatorContext context,
-        BaseEventNode eventNode,
+        BaseEventTypeNode eventNode,
         FilterOperand[] operands) throws UaException {
 
         validate(context, operands);
@@ -84,7 +84,7 @@ public class Equals implements Operator<Boolean> {
     }
 
     @Nullable
-    private static Object convert(@Nonnull Object value, BuiltinDataType targetType) {
+    private static Object convert(@NotNull Object value, BuiltinDataType targetType) {
         if (value.getClass().isArray()) {
             return convertArray(value, targetType);
         } else {
@@ -92,7 +92,7 @@ public class Equals implements Operator<Boolean> {
         }
     }
 
-    private static Object convertArray(@Nonnull Object array, BuiltinDataType targetType) {
+    private static Object convertArray(@NotNull Object array, BuiltinDataType targetType) {
         int[] dimensions = ArrayUtil.getDimensions(array);
 
         Object flattened = ArrayUtil.flatten(array);
@@ -119,7 +119,7 @@ public class Equals implements Operator<Boolean> {
         }
     }
 
-    private static BuiltinDataType getType(@Nonnull Object o) {
+    private static BuiltinDataType getType(@NotNull Object o) {
         if (o.getClass().isArray()) {
             return BuiltinDataType.fromBackingClass(ArrayUtil.getType(o));
         } else {

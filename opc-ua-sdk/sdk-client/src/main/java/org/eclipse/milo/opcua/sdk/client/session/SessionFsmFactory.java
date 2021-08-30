@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 the Eclipse Milo Authors
+ * Copyright (c) 2021 the Eclipse Milo Authors
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -41,10 +41,8 @@ import org.eclipse.milo.opcua.sdk.client.subscriptions.OpcUaSubscriptionManager;
 import org.eclipse.milo.opcua.stack.client.UaStackClient;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
 import org.eclipse.milo.opcua.stack.core.Identifiers;
-import org.eclipse.milo.opcua.stack.core.Stack;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
-import org.eclipse.milo.opcua.stack.core.security.CertificateValidator;
 import org.eclipse.milo.opcua.stack.core.security.SecurityAlgorithm;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ByteString;
@@ -75,6 +73,7 @@ import org.eclipse.milo.opcua.stack.core.types.structured.TransferSubscriptionsR
 import org.eclipse.milo.opcua.stack.core.types.structured.TransferSubscriptionsResponse;
 import org.eclipse.milo.opcua.stack.core.types.structured.UserIdentityToken;
 import org.eclipse.milo.opcua.stack.core.util.CertificateUtil;
+import org.eclipse.milo.opcua.stack.core.util.EndpointUtil;
 import org.eclipse.milo.opcua.stack.core.util.NonceUtil;
 import org.eclipse.milo.opcua.stack.core.util.SignatureUtil;
 import org.eclipse.milo.opcua.stack.core.util.Unit;
@@ -210,7 +209,7 @@ public class SessionFsmFactory {
                 }
                 KEY_WAIT_TIME.set(ctx, waitTime);
 
-                ScheduledFuture<?> waitFuture = Stack.sharedScheduledExecutor().schedule(
+                ScheduledFuture<?> waitFuture = client.getConfig().getScheduledExecutor().schedule(
                     () -> ctx.fireEvent(new Event.CreatingWaitExpired()),
                     waitTime,
                     TimeUnit.SECONDS
@@ -255,7 +254,12 @@ public class SessionFsmFactory {
 
         fb.when(State.Creating)
             .on(Event.CreateSessionFailure.class)
-            .transitionTo(State.CreatingWait);
+            .transitionTo(State.CreatingWait)
+            .executeFirst(ctx -> {
+                Event.CreateSessionFailure e = (Event.CreateSessionFailure) ctx.event();
+
+                handleFailureToOpenSession(client, ctx, e.failure);
+            });
 
 
         /* External Transition Actions */
@@ -269,7 +273,6 @@ public class SessionFsmFactory {
 
                 handleOpenSessionEvent(ctx);
 
-
                 //noinspection Duplicates
                 createSession(ctx, client).whenComplete((csr, ex) -> {
                     if (csr != null) {
@@ -278,8 +281,6 @@ public class SessionFsmFactory {
                         ctx.fireEvent(new Event.CreateSessionSuccess(csr));
                     } else {
                         LOGGER.debug("[{}] CreateSession failed: {}", ctx.getInstanceId(), ex.getMessage(), ex);
-
-                        handleFailureToOpenSession(client, ctx, ex);
 
                         ctx.fireEvent(new Event.CreateSessionFailure(ex));
                     }
@@ -298,8 +299,6 @@ public class SessionFsmFactory {
                         ctx.fireEvent(new Event.CreateSessionSuccess(csr));
                     } else {
                         LOGGER.debug("[{}] CreateSession failed: {}", ctx.getInstanceId(), ex.getMessage(), ex);
-
-                        handleFailureToOpenSession(client, ctx, ex);
 
                         ctx.fireEvent(new Event.CreateSessionFailure(ex));
                     }
@@ -331,7 +330,12 @@ public class SessionFsmFactory {
 
         fb.when(State.Activating)
             .on(Event.ActivateSessionFailure.class)
-            .transitionTo(State.CreatingWait);
+            .transitionTo(State.CreatingWait)
+            .executeFirst(ctx -> {
+                Event.ActivateSessionFailure e = (Event.ActivateSessionFailure) ctx.event();
+
+                handleFailureToOpenSession(client, ctx, e.failure);
+            });
 
 
         /* External Transition Actions */
@@ -349,8 +353,6 @@ public class SessionFsmFactory {
                         ctx.fireEvent(new Event.ActivateSessionSuccess(session));
                     } else {
                         LOGGER.debug("[{}] ActivateSession failed: {}", ctx.getInstanceId(), ex.getMessage(), ex);
-
-                        handleFailureToOpenSession(client, ctx, ex);
 
                         ctx.fireEvent(new Event.ActivateSessionFailure(ex));
                     }
@@ -382,7 +384,12 @@ public class SessionFsmFactory {
 
         fb.when(State.Transferring)
             .on(Event.TransferSubscriptionsFailure.class)
-            .transitionTo(State.CreatingWait);
+            .transitionTo(State.CreatingWait)
+            .executeFirst(ctx -> {
+                Event.TransferSubscriptionsFailure e = (Event.TransferSubscriptionsFailure) ctx.event();
+
+                handleFailureToOpenSession(client, ctx, e.failure);
+            });
 
 
         /* External Transition Actions */
@@ -402,8 +409,6 @@ public class SessionFsmFactory {
                         LOGGER.debug(
                             "[{}] TransferSubscriptions failed: {}",
                             ctx.getInstanceId(), ex.getMessage(), ex);
-
-                        handleFailureToOpenSession(client, ctx, ex);
 
                         ctx.fireEvent(new Event.TransferSubscriptionsFailure(ex));
                     }
@@ -435,7 +440,12 @@ public class SessionFsmFactory {
 
         fb.when(State.Initializing)
             .on(Event.InitializeFailure.class)
-            .transitionTo(State.CreatingWait);
+            .transitionTo(State.CreatingWait)
+            .executeFirst(ctx -> {
+                Event.InitializeFailure e = (Event.InitializeFailure) ctx.event();
+
+                handleFailureToOpenSession(client, ctx, e.failure);
+            });
 
 
         /* External Transition Actions */
@@ -455,8 +465,6 @@ public class SessionFsmFactory {
                         ctx.fireEvent(new Event.InitializeSuccess(session));
                     } else {
                         LOGGER.warn("[{}] Initialization failed: {}", ctx.getInstanceId(), session, ex);
-
-                        handleFailureToOpenSession(client, ctx, ex);
 
                         ctx.fireEvent(new Event.InitializeFailure(ex));
                     }
@@ -507,7 +515,7 @@ public class SessionFsmFactory {
                 long keepAliveInterval = client.getConfig().getKeepAliveInterval().longValue();
                 KEY_KEEP_ALIVE_FAILURE_COUNT.set(ctx, 0L);
 
-                ScheduledFuture<?> scheduledFuture = Stack.sharedScheduledExecutor().scheduleWithFixedDelay(
+                ScheduledFuture<?> scheduledFuture = client.getConfig().getScheduledExecutor().scheduleWithFixedDelay(
                     () -> ctx.fireEvent(new Event.KeepAlive(event.session)),
                     keepAliveInterval,
                     keepAliveInterval,
@@ -533,7 +541,7 @@ public class SessionFsmFactory {
             .to(s -> s == State.Closing || s == State.CreatingWait)
             .viaAny()
             .execute(ctx -> {
-                ScheduledFuture scheduledFuture =
+                ScheduledFuture<?> scheduledFuture =
                     KEY_KEEP_ALIVE_SCHEDULED_FUTURE.remove(ctx);
 
                 if (scheduledFuture != null) {
@@ -833,10 +841,11 @@ public class SessionFsmFactory {
                                     "match certificate from EndpointDescription!");
                         }
 
-                        CertificateValidator certificateValidator = client.getConfig().getCertificateValidator();
-
-                        certificateValidator.validate(serverCertificate);
-                        certificateValidator.verifyTrustChain(serverCertificateChain);
+                        client.getConfig().getCertificateValidator().validateCertificateChain(
+                            serverCertificateChain,
+                            endpoint.getServer().getApplicationUri(),
+                            EndpointUtil.getHost(endpoint.getEndpointUrl())
+                        );
 
                         SignatureData serverSignature = response.getServerSignature();
 
@@ -887,7 +896,7 @@ public class SessionFsmFactory {
                 buildClientSignature(client.getConfig(), csrNonce),
                 new SignedSoftwareCertificate[0],
                 new String[0],
-                ExtensionObject.encode(client.getSerializationContext(), userIdentityToken),
+                ExtensionObject.encode(client.getStaticSerializationContext(), userIdentityToken),
                 userTokenSignature
             );
 
@@ -1002,26 +1011,36 @@ public class SessionFsmFactory {
                         .map(UaException::getStatusCode)
                         .orElse(StatusCode.BAD);
 
-                    // Bad_ServiceUnsupported is the correct response when transfers aren't supported but
-                    // server implementations tend to interpret the spec in their own unique way...
+                    LOGGER.debug("[{}] TransferSubscriptions not supported: {}", ctx.getInstanceId(), statusCode);
+
+                    client.getConfig().getExecutor().execute(() -> {
+                        // transferFailed() will remove the subscription, but that is okay
+                        // because the list from getSubscriptions() above is a copy.
+                        for (UaSubscription subscription : subscriptions) {
+                            subscriptionManager.transferFailed(
+                                subscription.getSubscriptionId(), statusCode);
+                        }
+                    });
+
+                    // Bad_ServiceUnsupported is the correct response when transfers aren't
+                    // supported but server implementations interpret the spec differently.
                     if (statusCode.getValue() == StatusCodes.Bad_NotImplemented ||
                         statusCode.getValue() == StatusCodes.Bad_NotSupported ||
                         statusCode.getValue() == StatusCodes.Bad_OutOfService ||
                         statusCode.getValue() == StatusCodes.Bad_ServiceUnsupported) {
 
-                        LOGGER.debug("[{}] TransferSubscriptions not supported: {}", ctx.getInstanceId(), statusCode);
-
-                        client.getConfig().getExecutor().execute(() -> {
-                            // transferFailed() will remove the subscription, but that is okay
-                            // because the list from getSubscriptions() above is a copy.
-                            for (UaSubscription subscription : subscriptions) {
-                                subscriptionManager.transferFailed(
-                                    subscription.getSubscriptionId(), statusCode);
-                            }
-                        });
+                        // One of the expected responses; continue moving through the FSM.
 
                         transferFuture.complete(Unit.VALUE);
                     } else {
+                        // An unexpected response; complete exceptionally and start over.
+                        // Subsequent runs through the FSM will not attempt transfer because
+                        // transferFailed() has been called for all the existing subscriptions.
+                        // This will prevent us from getting stuck in a "loop" attempting to
+                        // reconnect to a defective server that responds with a channel-level
+                        // Error message to subscription transfer requests instead of an
+                        // application-level ServiceFault.
+
                         transferFuture.completeExceptionally(ex);
                     }
                 }
@@ -1043,7 +1062,7 @@ public class SessionFsmFactory {
         } else {
             UaStackClient stackClient = client.getStackClient();
 
-            CompletableFuture[] futures = initializers.stream()
+            CompletableFuture<?>[] futures = initializers.stream()
                 .map(i -> i.initialize(stackClient, session))
                 .toArray(CompletableFuture[]::new);
 
@@ -1087,15 +1106,17 @@ public class SessionFsmFactory {
         SecurityPolicy securityPolicy = SecurityPolicy.fromUri(endpoint.getSecurityPolicyUri());
 
         if (securityPolicy == SecurityPolicy.None) {
-            return new SignatureData();
+            return new SignatureData(null, null);
         } else {
             SecurityAlgorithm signatureAlgorithm = securityPolicy.getAsymmetricSignatureAlgorithm();
             PrivateKey privateKey = config.getKeyPair().map(KeyPair::getPrivate).orElse(null);
-            ByteString serverCertificate = endpoint.getServerCertificate();
+            List<X509Certificate> serverCertificates = CertificateUtil.decodeCertificates(
+                endpoint.getServerCertificate().bytesOrEmpty()
+            );
 
             // Signature data is serverCert + serverNonce signed with our private key.
             byte[] serverNonceBytes = serverNonce.bytesOrEmpty();
-            byte[] serverCertificateBytes = serverCertificate.bytesOrEmpty();
+            byte[] serverCertificateBytes = serverCertificates.get(0).getEncoded();
             byte[] dataToSign = Bytes.concat(serverCertificateBytes, serverNonceBytes);
 
             byte[] signature = SignatureUtil.sign(

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 the Eclipse Milo Authors
+ * Copyright (c) 2021 the Eclipse Milo Authors
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -11,6 +11,9 @@
 package org.eclipse.milo.examples.server;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.Security;
 import java.security.cert.X509Certificate;
@@ -18,6 +21,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.eclipse.milo.opcua.sdk.server.OpcUaServer;
@@ -29,7 +35,6 @@ import org.eclipse.milo.opcua.sdk.server.util.HostnameUtil;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaRuntimeException;
 import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateManager;
-import org.eclipse.milo.opcua.stack.core.security.DefaultCertificateValidator;
 import org.eclipse.milo.opcua.stack.core.security.DefaultTrustListManager;
 import org.eclipse.milo.opcua.stack.core.security.SecurityPolicy;
 import org.eclipse.milo.opcua.stack.core.transport.TransportProfile;
@@ -38,9 +43,11 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MessageSecurityMode;
 import org.eclipse.milo.opcua.stack.core.types.structured.BuildInfo;
 import org.eclipse.milo.opcua.stack.core.util.CertificateUtil;
+import org.eclipse.milo.opcua.stack.core.util.NonceUtil;
 import org.eclipse.milo.opcua.stack.core.util.SelfSignedCertificateGenerator;
 import org.eclipse.milo.opcua.stack.core.util.SelfSignedHttpsCertificateBuilder;
 import org.eclipse.milo.opcua.stack.server.EndpointConfiguration;
+import org.eclipse.milo.opcua.stack.server.security.DefaultServerCertificateValidator;
 import org.slf4j.LoggerFactory;
 
 import static com.google.common.collect.Lists.newArrayList;
@@ -56,6 +63,13 @@ public class ExampleServer {
     static {
         // Required for SecurityPolicy.Aes256_Sha256_RsaPss
         Security.addProvider(new BouncyCastleProvider());
+
+        try {
+            NonceUtil.blockUntilSecureRandomSeeded(10, TimeUnit.SECONDS);
+        } catch (ExecutionException | InterruptedException | TimeoutException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
     }
 
     public static void main(String[] args) throws Exception {
@@ -71,13 +85,21 @@ public class ExampleServer {
     }
 
     private final OpcUaServer server;
+    private final ExampleNamespace exampleNamespace;
 
     public ExampleServer() throws Exception {
-        File securityTempDir = new File(System.getProperty("java.io.tmpdir"), "security");
-        if (!securityTempDir.exists() && !securityTempDir.mkdirs()) {
+        Path securityTempDir = Paths.get(System.getProperty("java.io.tmpdir"), "server", "security");
+        Files.createDirectories(securityTempDir);
+        if (!Files.exists(securityTempDir)) {
             throw new Exception("unable to create security temp dir: " + securityTempDir);
         }
-        LoggerFactory.getLogger(getClass()).info("security temp dir: {}", securityTempDir.getAbsolutePath());
+
+        File pkiDir = securityTempDir.resolve("pki").toFile();
+
+        LoggerFactory.getLogger(getClass())
+            .info("security dir: {}", securityTempDir.toAbsolutePath());
+        LoggerFactory.getLogger(getClass())
+            .info("security pki dir: {}", pkiDir.getAbsolutePath());
 
         KeyStoreLoader loader = new KeyStoreLoader().load(securityTempDir);
 
@@ -86,11 +108,10 @@ public class ExampleServer {
             loader.getServerCertificateChain()
         );
 
-        File pkiDir = securityTempDir.toPath().resolve("pki").toFile();
         DefaultTrustListManager trustListManager = new DefaultTrustListManager(pkiDir);
-        LoggerFactory.getLogger(getClass()).info("pki dir: {}", pkiDir.getAbsolutePath());
 
-        DefaultCertificateValidator certificateValidator = new DefaultCertificateValidator(trustListManager);
+        DefaultServerCertificateValidator certificateValidator =
+            new DefaultServerCertificateValidator(trustListManager);
 
         KeyPair httpsKeyPair = SelfSignedCertificateGenerator.generateRsaKeyPair(2048);
 
@@ -151,7 +172,7 @@ public class ExampleServer {
 
         server = new OpcUaServer(serverConfig);
 
-        ExampleNamespace exampleNamespace = new ExampleNamespace(server);
+        exampleNamespace = new ExampleNamespace(server);
         exampleNamespace.startup();
     }
 
@@ -246,6 +267,8 @@ public class ExampleServer {
     }
 
     public CompletableFuture<OpcUaServer> shutdown() {
+        exampleNamespace.shutdown();
+
         return server.shutdown();
     }
 

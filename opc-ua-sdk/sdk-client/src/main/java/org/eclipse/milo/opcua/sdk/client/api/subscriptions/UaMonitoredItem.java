@@ -10,20 +10,26 @@
 
 package org.eclipse.milo.opcua.sdk.client.api.subscriptions;
 
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
-import org.eclipse.milo.opcua.stack.core.types.DataTypeManager;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExtensionObject;
 import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MonitoringMode;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 
 public interface UaMonitoredItem {
+
+    /**
+     * Get the {@link OpcUaClient} that created this monitored item.
+     *
+     * @return the {@link OpcUaClient} that created this monitored item.
+     */
+    OpcUaClient getClient();
 
     /**
      * Get the client-assigned id.
@@ -107,20 +113,27 @@ public interface UaMonitoredItem {
     ExtensionObject getMonitoringFilter();
 
     /**
+     * Get the discard policy.
+     * <p>
+     * {@code true} if oldest are discarded when the queue capacity is exceeded.
+     *
+     * @return the discard policy.
+     */
+    boolean getDiscardOldest();
+
+    /**
+     * Get the {@link TimestampsToReturn} requested when the item was created.
+     *
+     * @return the {@link TimestampsToReturn} requested when the item was created.
+     */
+    TimestampsToReturn getTimestamps();
+
+    /**
      * Set the {@link Consumer} that will receive values as they arrive from the server.
      *
      * @param valueConsumer the {@link Consumer} that will receive values as they arrive from the server.
      */
     void setValueConsumer(Consumer<DataValue> valueConsumer);
-
-    /**
-     * Set a {@link BiConsumer} that will receive values as they arrive from the server.
-     * <p>
-     * The {@link UaMonitoredItem} in the consumer will be this item.
-     *
-     * @param valueConsumer the {@link BiConsumer} that will receive values as they arrive from the server.
-     */
-    void setValueConsumer(BiConsumer<UaMonitoredItem, DataValue> valueConsumer);
 
     /**
      * Set a {@link ValueConsumer} that will receive values as they arrive from the server.
@@ -139,15 +152,6 @@ public interface UaMonitoredItem {
     void setEventConsumer(Consumer<Variant[]> eventConsumer);
 
     /**
-     * Set the {@link BiConsumer} that will receive events as they arrive from the server.
-     * <p>
-     * The {@link UaMonitoredItem} in the consumer will be this item.
-     *
-     * @param eventConsumer the {@link BiConsumer} that will receive events as they arrive from the server.
-     */
-    void setEventConsumer(BiConsumer<UaMonitoredItem, Variant[]> eventConsumer);
-
-    /**
      * Set the {@link EventConsumer} that will receive events as they arrive from the server.
      *
      * @param eventConsumer the {@link EventConsumer} that will receive events as they arrive from the server.
@@ -159,11 +163,10 @@ public interface UaMonitoredItem {
         /**
          * A new value has arrived for the {@link UaMonitoredItem} {@code item}.
          *
-         * @param dataTypeManager the {@link DataTypeManager} from {@link OpcUaClient#getDataTypeManager()}.
-         * @param item            the {@link UaMonitoredItem} this value is for.
-         * @param value           the new {@link DataValue}.
+         * @param item  the {@link UaMonitoredItem} this value is for.
+         * @param value the new {@link DataValue}.
          */
-        void onValueArrived(DataTypeManager dataTypeManager, UaMonitoredItem item, DataValue value);
+        void onValueArrived(UaMonitoredItem item, DataValue value);
 
     }
 
@@ -172,11 +175,10 @@ public interface UaMonitoredItem {
         /**
          * A new event has arrived for the {@link UaMonitoredItem} {@code item}.
          *
-         * @param dataTypeManager the {@link DataTypeManager} from {@link OpcUaClient#getDataTypeManager()}.
-         * @param item            the {@link UaMonitoredItem} this event is for.
-         * @param eventValues     the event values.
+         * @param item        the {@link UaMonitoredItem} this event is for.
+         * @param eventValues the event values.
          */
-        void onEventArrived(DataTypeManager dataTypeManager, UaMonitoredItem item, Variant[] eventValues);
+        void onEventArrived(UaMonitoredItem item, Variant[] eventValues);
 
     }
 

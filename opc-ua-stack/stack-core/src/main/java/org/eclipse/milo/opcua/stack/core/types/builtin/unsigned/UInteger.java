@@ -11,7 +11,8 @@
 package org.eclipse.milo.opcua.stack.core.types.builtin.unsigned;
 
 import java.io.ObjectStreamException;
-import javax.annotation.Nonnull;
+
+import org.jetbrains.annotations.NotNull;
 
 /**
  * The <code>unsigned int</code> type
@@ -83,7 +84,7 @@ public final class UInteger extends UNumber implements Comparable<UInteger> {
      * negative no cache will be created. If the value is larger than
      * {@link Integer#MAX_VALUE} then Integer#MAX_VALUE will be used.
      */
-    private static final int getPrecacheSize() {
+    private static int getPrecacheSize() {
         String prop = null;
         long propParsed;
 
@@ -123,7 +124,7 @@ public final class UInteger extends UNumber implements Comparable<UInteger> {
      *
      * @return Array of cached values for UInteger
      */
-    private static final UInteger[] mkValues() {
+    private static UInteger[] mkValues() {
         int precacheSize = getPrecacheSize();
         UInteger[] ret;
 
@@ -301,7 +302,7 @@ public final class UInteger extends UNumber implements Comparable<UInteger> {
     }
 
     @Override
-    public int compareTo(@Nonnull UInteger o) {
+    public int compareTo(@NotNull UInteger o) {
         return (value < o.value ? -1 : (value == o.value ? 0 : 1));
     }
 

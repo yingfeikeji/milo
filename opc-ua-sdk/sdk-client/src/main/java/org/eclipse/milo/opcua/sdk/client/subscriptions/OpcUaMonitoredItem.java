@@ -10,7 +10,6 @@
 
 package org.eclipse.milo.opcua.sdk.client.subscriptions;
 
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.eclipse.milo.opcua.sdk.client.OpcUaClient;
@@ -21,6 +20,7 @@ import org.eclipse.milo.opcua.stack.core.types.builtin.StatusCode;
 import org.eclipse.milo.opcua.stack.core.types.builtin.Variant;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.MonitoringMode;
+import org.eclipse.milo.opcua.stack.core.types.enumerated.TimestampsToReturn;
 import org.eclipse.milo.opcua.stack.core.types.structured.ReadValueId;
 
 import static org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.Unsigned.uint;
@@ -41,6 +41,8 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
     private volatile ExtensionObject filterResult;
     private volatile MonitoringMode monitoringMode = MonitoringMode.Disabled;
     private volatile ExtensionObject monitoringFilter;
+    private volatile boolean discardOldest;
+    private volatile TimestampsToReturn timestamps;
 
     private final UInteger clientHandle;
     private final ReadValueId readValueId;
@@ -56,7 +58,10 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
         UInteger revisedQueueSize,
         ExtensionObject filterResult,
         MonitoringMode monitoringMode,
-        ExtensionObject monitoringFilter) {
+        ExtensionObject monitoringFilter,
+        boolean discardOldest,
+        TimestampsToReturn timestamps
+    ) {
 
         this.client = client;
         this.clientHandle = clientHandle;
@@ -68,6 +73,13 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
         this.filterResult = filterResult;
         this.monitoringMode = monitoringMode;
         this.monitoringFilter = monitoringFilter;
+        this.discardOldest = discardOldest;
+        this.timestamps = timestamps;
+    }
+
+    @Override
+    public OpcUaClient getClient() {
+        return client;
     }
 
     @Override
@@ -126,13 +138,18 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
     }
 
     @Override
-    public void setValueConsumer(Consumer<DataValue> consumer) {
-        this.valueConsumer = (dataTypeManager, item, value) -> consumer.accept(value);
+    public boolean getDiscardOldest() {
+        return discardOldest;
     }
 
     @Override
-    public void setValueConsumer(BiConsumer<UaMonitoredItem, DataValue> valueBiConsumer) {
-        this.valueConsumer = (dataTypeManager, item, value) -> valueBiConsumer.accept(item, value);
+    public TimestampsToReturn getTimestamps() {
+        return timestamps;
+    }
+
+    @Override
+    public void setValueConsumer(Consumer<DataValue> consumer) {
+        this.valueConsumer = (item, value) -> consumer.accept(value);
     }
 
     @Override
@@ -142,12 +159,7 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
 
     @Override
     public void setEventConsumer(Consumer<Variant[]> consumer) {
-        this.eventConsumer = (dataTypeManager, item, values) -> consumer.accept(values);
-    }
-
-    @Override
-    public void setEventConsumer(BiConsumer<UaMonitoredItem, Variant[]> eventBiConsumer) {
-        this.eventConsumer = (dataTypeManager, item, values) -> eventBiConsumer.accept(item, values);
+        this.eventConsumer = (item, values) -> consumer.accept(values);
     }
 
     @Override
@@ -161,6 +173,10 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
 
     void setFilterResult(ExtensionObject filterResult) {
         this.filterResult = filterResult;
+    }
+
+    void setRequestedFilter(ExtensionObject filter) {
+        this.monitoringFilter = filter;
     }
 
     void setRequestedSamplingInterval(double requestedSamplingInterval) {
@@ -183,14 +199,22 @@ public class OpcUaMonitoredItem implements UaMonitoredItem {
         this.monitoringMode = monitoringMode;
     }
 
+    void setTimestamps(TimestampsToReturn timestamps) {
+        this.timestamps = timestamps;
+    }
+
+    void setDiscardOldest(boolean discardOldest) {
+        this.discardOldest = discardOldest;
+    }
+
     void onValueArrived(DataValue value) {
         ValueConsumer c = valueConsumer;
-        if (c != null) c.onValueArrived(client.getDataTypeManager(), this, value);
+        if (c != null) c.onValueArrived(this, value);
     }
 
     void onEventArrived(Variant[] values) {
         EventConsumer c = eventConsumer;
-        if (c != null) c.onEventArrived(client.getDataTypeManager(), this, values);
+        if (c != null) c.onEventArrived(this, values);
     }
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019 the Eclipse Milo Authors
+ * Copyright (c) 2021 the Eclipse Milo Authors
  *
  * This program and the accompanying materials are made
  * available under the terms of the Eclipse Public License 2.0
@@ -10,28 +10,25 @@
 
 package org.eclipse.milo.opcua.sdk.server.nodes;
 
-import javax.annotation.Nullable;
-
-import org.eclipse.milo.opcua.sdk.core.QualifiedProperty;
-import org.eclipse.milo.opcua.sdk.core.ValueRanks;
-import org.eclipse.milo.opcua.sdk.server.api.nodes.VariableTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableNodeProperties;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableTypeNode;
+import org.eclipse.milo.opcua.sdk.core.nodes.VariableTypeNodeProperties;
 import org.eclipse.milo.opcua.stack.core.AttributeId;
-import org.eclipse.milo.opcua.stack.core.Identifiers;
 import org.eclipse.milo.opcua.stack.core.types.builtin.DataValue;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.QualifiedName;
 import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.enumerated.NodeClass;
-import org.eclipse.milo.opcua.stack.core.util.Namespaces;
+import org.jetbrains.annotations.Nullable;
 
 public class UaVariableTypeNode extends UaNode implements VariableTypeNode {
 
-    private volatile DataValue value;
-    private volatile NodeId dataType;
-    private volatile Integer valueRank;
-    private volatile UInteger[] arrayDimensions;
-    private volatile Boolean isAbstract;
+    private DataValue value;
+    private NodeId dataType;
+    private Integer valueRank;
+    private UInteger[] arrayDimensions;
+    private Boolean isAbstract;
 
     public UaVariableTypeNode(
         UaNodeContext context,
@@ -59,79 +56,129 @@ public class UaVariableTypeNode extends UaNode implements VariableTypeNode {
 
     @Override
     public DataValue getValue() {
-        return value;
+        return (DataValue) filterChain.getAttribute(this, AttributeId.Value);
     }
 
     @Override
     public NodeId getDataType() {
-        return dataType;
+        return (NodeId) filterChain.getAttribute(this, AttributeId.DataType);
     }
 
     @Override
     public Integer getValueRank() {
-        return valueRank;
+        return (Integer) filterChain.getAttribute(this, AttributeId.ValueRank);
     }
 
     @Override
     public UInteger[] getArrayDimensions() {
-        return arrayDimensions;
+        return (UInteger[]) filterChain.getAttribute(this, AttributeId.ArrayDimensions);
     }
 
     @Override
     public Boolean getIsAbstract() {
-        return isAbstract;
+        return (Boolean) filterChain.getAttribute(this, AttributeId.IsAbstract);
     }
 
     @Override
-    public synchronized void setValue(DataValue value) {
-        this.value = value;
-
-        fireAttributeChanged(AttributeId.Value, value);
+    public void setValue(DataValue value) {
+        filterChain.setAttribute(this, AttributeId.Value, value);
     }
 
     @Override
-    public synchronized void setDataType(NodeId dataType) {
-        this.dataType = dataType;
-
-        fireAttributeChanged(AttributeId.Value, dataType);
+    public void setDataType(NodeId dataType) {
+        filterChain.setAttribute(this, AttributeId.DataType, dataType);
     }
 
     @Override
-    public synchronized void setValueRank(Integer valueRank) {
-        this.valueRank = valueRank;
-
-        fireAttributeChanged(AttributeId.ValueRank, valueRank);
+    public void setValueRank(Integer valueRank) {
+        filterChain.setAttribute(this, AttributeId.ValueRank, valueRank);
     }
 
     @Override
-    public synchronized void setArrayDimensions(UInteger[] arrayDimensions) {
-        this.arrayDimensions = arrayDimensions;
-
-        fireAttributeChanged(AttributeId.ArrayDimensions, arrayDimensions);
+    public void setArrayDimensions(UInteger[] arrayDimensions) {
+        filterChain.setAttribute(this, AttributeId.ArrayDimensions, arrayDimensions);
     }
 
     @Override
-    public synchronized void setIsAbstract(Boolean isAbstract) {
-        this.isAbstract = isAbstract;
-
-        fireAttributeChanged(AttributeId.IsAbstract, isAbstract);
+    public void setIsAbstract(Boolean isAbstract) {
+        filterChain.setAttribute(this, AttributeId.IsAbstract, isAbstract);
     }
 
+    @Override
+    public synchronized Object getAttribute(AttributeId attributeId) {
+        switch (attributeId) {
+            case Value:
+                return value;
+
+            case DataType:
+                return dataType;
+
+            case ValueRank:
+                return valueRank;
+
+            case ArrayDimensions:
+                return arrayDimensions;
+
+            case IsAbstract:
+                return isAbstract;
+
+            default:
+                return super.getAttribute(attributeId);
+        }
+    }
+
+    @Override
+    public synchronized void setAttribute(AttributeId attributeId, Object value) {
+        switch (attributeId) {
+            case Value:
+                this.value = (DataValue) value;
+                break;
+
+            case DataType:
+                dataType = (NodeId) value;
+                break;
+
+            case ValueRank:
+                valueRank = (Integer) value;
+                break;
+
+            case ArrayDimensions:
+                arrayDimensions = (UInteger[]) value;
+                break;
+
+            case IsAbstract:
+                isAbstract = (Boolean) value;
+                break;
+
+            default:
+                super.setAttribute(attributeId, value);
+                return; // prevent firing an attribute change
+        }
+
+        fireAttributeChanged(attributeId, value);
+    }
+
+    /**
+     * Get the value of the NodeVersion Property, if it exists.
+     *
+     * @return the value of the NodeVersion Property, if it exists.
+     * @see VariableTypeNodeProperties#NodeVersion
+     */
     @Nullable
     public String getNodeVersion() {
-        return getProperty(NodeVersion).orElse(null);
+        return getProperty(VariableTypeNodeProperties.NodeVersion).orElse(null);
     }
 
+    /**
+     * Set the value of the NodeVersion Property.
+     * <p>
+     * A PropertyNode will be created if it does not already exist.
+     *
+     * @param nodeVersion the value to set.
+     * @see VariableNodeProperties#NodeVersion
+     */
     public void setNodeVersion(String nodeVersion) {
-        setProperty(NodeVersion, nodeVersion);
+        setProperty(VariableTypeNodeProperties.NodeVersion, nodeVersion);
     }
-
-    public static final QualifiedProperty<String> NodeVersion = new QualifiedProperty<>(
-        Namespaces.OPC_UA,
-        "NodeVersion",
-        Identifiers.String,
-        ValueRanks.Scalar,
-        String.class
-    );
 
 }

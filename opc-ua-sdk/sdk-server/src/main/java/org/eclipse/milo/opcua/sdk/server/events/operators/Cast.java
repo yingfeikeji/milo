@@ -10,19 +10,18 @@
 
 package org.eclipse.milo.opcua.sdk.server.events.operators;
 
-import javax.annotation.Nullable;
-
 import org.eclipse.milo.opcua.sdk.server.events.FilterContext;
 import org.eclipse.milo.opcua.sdk.server.events.OperatorContext;
 import org.eclipse.milo.opcua.sdk.server.events.ValidationException;
 import org.eclipse.milo.opcua.sdk.server.events.conversions.ImplicitConversions;
-import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventNode;
+import org.eclipse.milo.opcua.sdk.server.model.nodes.objects.BaseEventTypeNode;
 import org.eclipse.milo.opcua.stack.core.BuiltinDataType;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.types.builtin.ExpandedNodeId;
 import org.eclipse.milo.opcua.stack.core.types.builtin.NodeId;
 import org.eclipse.milo.opcua.stack.core.types.structured.FilterOperand;
+import org.jetbrains.annotations.Nullable;
 
 
 public class Cast implements Operator<Object> {
@@ -40,7 +39,7 @@ public class Cast implements Operator<Object> {
     @Override
     public Object apply(
         OperatorContext context,
-        BaseEventNode eventNode,
+        BaseEventTypeNode eventNode,
         FilterOperand[] operands) throws UaException {
 
         validate(context, operands);

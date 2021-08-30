@@ -25,8 +25,8 @@ import org.eclipse.milo.opcua.stack.core.Stack;
 import org.eclipse.milo.opcua.stack.core.StatusCodes;
 import org.eclipse.milo.opcua.stack.core.UaException;
 import org.eclipse.milo.opcua.stack.core.channel.ChannelParameters;
+import org.eclipse.milo.opcua.stack.core.channel.EncodingLimits;
 import org.eclipse.milo.opcua.stack.core.channel.ExceptionHandler;
-import org.eclipse.milo.opcua.stack.core.channel.MessageLimits;
 import org.eclipse.milo.opcua.stack.core.channel.SerializationQueue;
 import org.eclipse.milo.opcua.stack.core.channel.headers.HeaderDecoder;
 import org.eclipse.milo.opcua.stack.core.channel.messages.AcknowledgeMessage;
@@ -127,13 +127,14 @@ public class UascServerHelloHandler extends ByteToMessageDecoder implements Head
 
         String endpointUrl = hello.getEndpointUrl();
 
-        boolean endpointMatch = stackServer.getEndpointDescriptions()
-            .stream()
-            .anyMatch(endpoint ->
-                Objects.equals(
-                    EndpointUtil.getPath(endpointUrl),
-                    EndpointUtil.getPath(endpoint.getEndpointUrl()))
-            );
+        boolean endpointMatch = endpointUrl != null &&
+            stackServer.getEndpointDescriptions()
+                .stream()
+                .anyMatch(endpoint ->
+                    Objects.equals(
+                        EndpointUtil.getPath(endpointUrl),
+                        EndpointUtil.getPath(endpoint.getEndpointUrl()))
+                );
 
         if (!endpointMatch) {
             throw new UaException(
@@ -154,7 +155,7 @@ public class UascServerHelloHandler extends ByteToMessageDecoder implements Head
                 "unsupported protocol version: " + remoteProtocolVersion);
         }
 
-        MessageLimits config = stackServer.getConfig().getMessageLimits();
+        EncodingLimits config = stackServer.getConfig().getEncodingLimits();
 
         /* Our receive buffer size is determined by the remote send buffer size. */
         long localReceiveBufferSize = Math.min(remoteSendBufferSize, config.getMaxChunkSize());
@@ -211,7 +212,8 @@ public class UascServerHelloHandler extends ByteToMessageDecoder implements Head
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         if (cause instanceof IOException) {
             ctx.close();
-            logger.debug("[remote={}] IOException caught; channel closed");
+            logger.debug("[remote={}] IOException caught; channel closed",
+                ctx.channel().remoteAddress(), cause);
         } else {
             ErrorMessage errorMessage = ExceptionHandler.sendErrorMessage(ctx, cause);
 

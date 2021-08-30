@@ -17,13 +17,13 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
-import org.eclipse.milo.opcua.stack.core.channel.MessageLimits;
+import org.eclipse.milo.opcua.stack.core.channel.EncodingLimits;
 import org.eclipse.milo.opcua.stack.core.security.CertificateManager;
-import org.eclipse.milo.opcua.stack.core.security.CertificateValidator;
 import org.eclipse.milo.opcua.stack.core.security.TrustListManager;
-import org.eclipse.milo.opcua.stack.core.serialization.EncodingLimits;
 import org.eclipse.milo.opcua.stack.core.types.builtin.LocalizedText;
+import org.eclipse.milo.opcua.stack.core.types.builtin.unsigned.UInteger;
 import org.eclipse.milo.opcua.stack.core.types.structured.ApplicationDescription;
+import org.eclipse.milo.opcua.stack.server.security.ServerCertificateValidator;
 
 public interface UaStackServerConfig {
 
@@ -62,14 +62,19 @@ public interface UaStackServerConfig {
     String getProductUri();
 
     /**
-     * @return the {@link MessageLimits}.
-     */
-    MessageLimits getMessageLimits();
-
-    /**
      * @return the configured {@link EncodingLimits}.
      */
     EncodingLimits getEncodingLimits();
+
+    /**
+     * @return the minimum allowable secure channel lifetime, in milliseconds.
+     */
+    UInteger getMinimumSecureChannelLifetime();
+
+    /**
+     * @return the maximum allowable secure channel lifetime, in milliseconds.
+     */
+    UInteger getMaximumSecureChannelLifetime();
 
     /**
      * @return the {@link CertificateManager} for this server.
@@ -82,9 +87,9 @@ public interface UaStackServerConfig {
     TrustListManager getTrustListManager();
 
     /**
-     * @return the {@link CertificateValidator} for this server.
+     * @return the {@link ServerCertificateValidator} for this server.
      */
-    CertificateValidator getCertificateValidator();
+    ServerCertificateValidator getCertificateValidator();
 
     /**
      * @return the {@link KeyPair} used for SSL/TLS with HTTPS endpoints.
@@ -93,8 +98,18 @@ public interface UaStackServerConfig {
 
     /**
      * @return the {@link X509Certificate} used for SSL/TLS with HTTPS endpoints.
+     * @deprecated This will only return the leaf certificate, use @{{@link #getHttpsCertificateChain()}} to get the
+     * full chain.
      */
-    Optional<X509Certificate> getHttpsCertificate();
+    @Deprecated
+    default Optional<X509Certificate> getHttpsCertificate() {
+        return getHttpsCertificateChain().flatMap(chain -> Optional.ofNullable(chain[0]));
+    }
+
+    /**
+     * @return the {@link X509Certificate} used for SSL/TLS with HTTPS endpoints.
+     */
+    Optional<X509Certificate[]> getHttpsCertificateChain();
 
     /**
      * @return the {@link ExecutorService} for this server.
@@ -124,13 +139,14 @@ public interface UaStackServerConfig {
         builder.setApplicationName(config.getApplicationName());
         builder.setApplicationUri(config.getApplicationUri());
         builder.setProductUri(config.getProductUri());
-        builder.setMessageLimits(config.getMessageLimits());
         builder.setEncodingLimits(config.getEncodingLimits());
+        builder.setMinimumSecureChannelLifetime(config.getMinimumSecureChannelLifetime());
+        builder.setMaximumSecureChannelLifetime(config.getMaximumSecureChannelLifetime());
         builder.setCertificateManager(config.getCertificateManager());
         builder.setTrustListManager(config.getTrustListManager());
         builder.setCertificateValidator(config.getCertificateValidator());
         builder.setHttpsKeyPair(config.getHttpsKeyPair().orElse(null));
-        builder.setHttpsCertificate(config.getHttpsCertificate().orElse(null));
+        builder.setHttpsCertificateChain(config.getHttpsCertificateChain().orElse(null));
         builder.setExecutor(config.getExecutor());
 
         return builder;
